@@ -1,0 +1,33 @@
+shurly {{ include "shurly.fullname" . }} has been installed in namespace {{ .Release.Namespace }}.
+
+API Service:  {{ include "shurly.fullname" . }} (port {{ .Values.service.port }})
+Replicas:     api={{ .Values.replicas.api }}  worker={{ .Values.replicas.worker }}  beat=1
+Migrations:   run as an initContainer on the API pods (alembic upgrade head, idempotent)
+
+Check status:
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+  kubectl -n {{ .Release.Namespace }} logs deploy/{{ include "shurly.fullname" . }}-api
+
+From inside the cluster, the API is reachable at:
+  http://{{ include "shurly.fullname" . }}:{{ .Values.service.port }}
+
+{{- if .Values.ingress.enabled }}
+
+The Ingress is enabled. Once a DNS record points at the ingress controller,
+hit:
+  http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}
+{{- else }}
+
+The Ingress is disabled. To reach the API outside the cluster, either enable
+it (`--set ingress.enabled=true --set ingress.hosts[0].host=short.example.com`)
+or port-forward:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "shurly.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+{{- end }}
+
+{{- if not .Values.secretRef.name }}
+
+WARNING: no `secretRef` is configured. Make sure SHURLY_DATABASE_URL and
+SHURLY_ADMIN_TOKEN are set (e.g. in `env`) for this release to work. In
+production, prefer a Secret:
+  --set secretRef.name=shurly-secrets
+{{- end }}

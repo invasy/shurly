@@ -1,0 +1,17 @@
+apiVersion: v2
+type: application
+name: shurly
+description: A scalable URL shortener
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - url-shortener
+  - fastapi
+  - redis
+  - postgresql
+home: https://github.com/invasy/shurly
+sources:
+  - https://github.com/invasy/shurly
+maintainers:
+  - name: Vasiliy Polyakov
+    email: job@vpolyakov.cv

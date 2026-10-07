@@ -1,0 +1,91 @@
+name: shurly
+
+x-app-build: &app-build
+  context: .
+  dockerfile: Dockerfile
+
+x-app-env: &app-env
+  SHURLY_ENVIRONMENT: ${SHURLY_ENVIRONMENT:-development}
+  SHURLY_DATABASE_URL: postgresql://shurly:shurly@postgres:5432/shurly
+  SHURLY_REDIS_URL: redis://redis:6379/0
+  SHURLY_BASE_URL: http://localhost:8000
+  SHURLY_CODE_STRATEGY: ${SHURLY_CODE_STRATEGY:-base62}
+  SHURLY_IDEMPOTENT: ${SHURLY_IDEMPOTENT:-true}
+  SHURLY_API_KEYS_ENABLED: ${SHURLY_API_KEYS_ENABLED:-true}
+  SHURLY_RATE_LIMIT_ENABLED: ${SHURLY_RATE_LIMIT_ENABLED:-true}
+  SHURLY_DEFAULT_RATE_LIMIT: ${SHURLY_DEFAULT_RATE_LIMIT:-100}
+  SHURLY_ALLOW_LOCALHOST: "true"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: shurly
+      POSTGRES_PASSWORD: shurly
+      POSTGRES_DB: shurly
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shurly -d shurly"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    build: *app-build
+    environment: *app-env
+    command: ["sh", "-c", "alembic upgrade head && echo 'migrations applied'"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: *app-build
+    environment: *app-env
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  worker:
+    build: *app-build
+    environment: *app-env
+    command: ["celery", "-A", "app.tasks.celery_app:celery_app", "worker", "--loglevel", "INFO", "--concurrency", "4"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  beat:
+    build: *app-build
+    environment: *app-env
+    command: ["celery", "-A", "app.tasks.celery_app:celery_app", "beat", "--loglevel", "INFO"]
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

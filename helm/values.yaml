@@ -1,0 +1,115 @@
+# Default values for the shurly chart.
+#
+# `env` maps directly to SHURLY_* variables; pass any setting documented in
+# .env.example here. In a real cluster, put SHURLY_DATABASE_URL and
+# SHURLY_ADMIN_TOKEN in a Secret and reference it via `secretRef` instead of
+# putting them in `env`.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: shurly
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Number of replicas per workload.
+replicas:
+  api: 2
+  worker: 2
+  beat: 1
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+  annotations: {}
+
+# SHURLY_* environment variables applied to every workload.
+# Only set the non-secret ones here; use `secretRef` for credentials.
+env:
+  SHURLY_ENVIRONMENT: production
+  SHURLY_BASE_URL: ""
+  SHURLY_REDIS_URL: ""
+  # SHURLY_DATABASE_URL and SHURLY_ADMIN_TOKEN intentionally omitted --
+  # provide them via secretRef in production.
+
+# Optional reference to a Secret holding sensitive config. When set, the
+# chart injects SHURLY_DATABASE_URL and SHURLY_ADMIN_TOKEN from it.
+#
+#   kubectl -n shurly create secret generic shurly-secrets \
+#     --from-literal=shurly_database_url="postgresql://shurly:shurly@postgres:5432/shurly" \
+#     --from-literal=shurly_admin_token="changeme"
+secretRef:
+  name: ""
+  databaseKey: shurly_database_url
+  adminTokenKey: shurly_admin_token
+
+# Run `alembic upgrade head` as a one-shot Job that gates the API.
+migrate:
+  enabled: true
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: short.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Health probes. `/health` is liveness, `/ready` is readiness (see docs/api.md).
+livenessProbe:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 3
+  failureThreshold: 3
+readinessProbe:
+  enabled: true
+  path: /ready
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+resources:
+  api:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  worker:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  beat:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+priorityClassName: ""

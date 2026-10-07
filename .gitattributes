@@ -1,0 +1,34 @@
+# Normalise text files to LF across platforms.
+* text=auto eol=lf
+
+# Source and config
+*.py text
+*.pyi text
+*.md text
+*.rst text
+*.toml text
+*.ini text
+*.cfg text
+*.yaml text
+*.yml text
+*.json text
+*.txt text
+
+# Executable scripts (force the executable bit).
+*.sh text eol=lf diff=shell
+*.Makefile text
+Makefile text eol=lf
+
+# The Dockerfile is parsed by the engine; keep it LF so buildKit is happy.
+Dockerfile text eol=lf
+
+# Binary assets, if any are added later.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.mmdb binary

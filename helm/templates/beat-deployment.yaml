@@ -1,0 +1,50 @@
+# Celery beat is a singleton (it schedules periodic tasks); keep it at a
+# single replica to avoid duplicate scheduling.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shurly.fullname" . }}-beat
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "shurly.labels" . | nindent 4 }}
+    app.kubernetes.io/component: beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "shurly.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: beat
+  template:
+    metadata:
+      labels:
+        {{- include "shurly.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: beat
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "shurly.serviceAccountName" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: beat
+          image: {{ include "shurly.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - celery
+            - -A
+            - app.tasks.celery_app:celery_app
+            - beat
+            - --loglevel
+            - INFO
+          env:
+            {{- include "shurly.env" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources.beat | nindent 12 }}
